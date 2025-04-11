@@ -271,6 +271,8 @@
             <a href="#ui">UI (index.html)</a>
             <a href="#server">Server (server.js)</a>
             <a href="#architecture">Architecture</a>
+            <a href="#deployment">Deployment</a>
+            <a href="#technologies">Technologies</a>
         </nav>
     </header>
 
@@ -849,6 +851,95 @@ if (game.ticksSinceStart > GRACE_PERIOD_TICKS) {
             </ul>
         </section>
 
+        <section id="deployment" class="section">
+            <h2>Deployment (README.md)</h2>
+            <p>The game server is deployed using PM2, a process manager for Node.js applications. The README.md file contains essential PM2 commands for managing the application:</p>
+
+            <h3>Basic Commands</h3>
+            <div class="code-example">
+                <pre>
+# Start your application
+pm2 start server.js --name snake-game
+
+# Restart your application
+pm2 restart snake-game
+
+# Stop your application
+pm2 stop snake-game
+
+# Delete/remove application from PM2
+pm2 delete snake-game
+
+# List all running applications
+pm2 list
+
+# Display detailed information about a specific application
+pm2 show snake-game</pre>
+            </div>
+
+            <h3>Monitoring & Logs</h3>
+            <div class="code-example">
+                <pre>
+# Monitor all applications in real-time
+pm2 monit
+
+# Display logs of all applications
+pm2 logs
+
+# Display only snake-game logs
+pm2 logs snake-game
+
+# Display limited number of lines
+pm2 logs snake-game --lines 100
+
+# Flush all log data
+pm2 flush</pre>
+            </div>
+
+            <h3>Startup & Auto-Restart</h3>
+            <div class="code-example">
+                <pre>
+# Generate startup script to automatically start PM2 on system boot
+pm2 startup
+
+# Save current PM2 process list for automatic restart
+pm2 save
+
+# Restore previously saved processes
+pm2 resurrect</pre>
+            </div>
+
+            <h3>Updates & Reloads</h3>
+            <div class="code-example">
+                <pre>
+# Reload application with zero downtime
+pm2 reload snake-game
+
+# Restart all applications
+pm2 restart all
+
+# Update PM2 to the latest version
+pm2 update</pre>
+            </div>
+
+            <h3>Troubleshooting</h3>
+            <div class="code-example">
+                <pre>
+# Kill PM2 daemon
+pm2 kill
+
+# Reset PM2 metadata
+pm2 reset snake-game
+
+# View information about your PM2 installation
+pm2 env snake-game</pre>
+            </div>
+
+            <div class="note">
+                <p><strong>Note:</strong> PM2 ensures that the game server remains running even after system restarts and manages automatic restarts if the application crashes.</p>
+            </div>
+        </section>
+
         <section class="section">
             <h2>Conclusion</h2>
             <p>This multiplayer Snake game demonstrates:</p>
@@ -866,6 +957,52 @@ if (game.ticksSinceStart > GRACE_PERIOD_TICKS) {
                 <li><strong>Server-side logic (server.js):</strong> Manages game state, player connections, and game mechanics</li>
             </ul>
             <p>This architecture allows for a smooth multiplayer experience where players can create or join game rooms, compete against each other, and see real-time updates across all connected clients.</p>
+        </section>
+
+        <section id="technologies" class="section">
+            <h2>Technologies Used</h2>
+            <p>This multiplayer Snake game utilizes several modern web technologies:</p>
+
+            <div class="feature-list">
+                <div class="feature-card">
+                    <h4>HTML5</h4>
+                    <p>HTML5 is the latest version of the Hypertext Markup Language, providing the structural foundation for the game. It includes semantic elements, form controls, and multimedia support. In this project, HTML5 structures the game interface, forms for player input, and hosts the canvas element.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h4>CSS3</h4>
+                    <p>CSS3 (Cascading Style Sheets) handles all visual styling aspects of the game. It includes features like animations, transitions, gradients, and flexible box layout. The game uses CSS variables for theming, responsive design for different screen sizes, and animations for visual feedback.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h4>JavaScript</h4>
+                    <p>JavaScript is the programming language that powers the game's client-side logic. It handles user input, DOM manipulation, animation, and communication with the server. The game leverages modern JavaScript features like arrow functions, template literals, and promises for cleaner, more efficient code.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h4>Node.js</h4>
+                    <p>Node.js is a JavaScript runtime built on Chrome's V8 engine that allows running JavaScript on the server. It uses an event-driven, non-blocking I/O model that makes it lightweight and efficient. In this project, Node.js powers the game server, handling game logic and player connections with high performance.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h4>Express</h4>
+                    <p>Express is a minimal and flexible Node.js web application framework that provides robust features for web and mobile applications. The game server uses Express to handle HTTP routing, serve static files, and integrate middleware for CORS support and other functionality.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h4>Socket.IO</h4>
+                    <p>Socket.IO enables real-time, bidirectional communication between clients and the server. It uses WebSockets as the primary transport with fallbacks to other methods when necessary. The game relies on Socket.IO for transmitting player movements, game state updates, and player join/leave events with minimal latency.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h4>Canvas API</h4>
+                    <p>The HTML5 Canvas API allows dynamic, scriptable rendering of 2D shapes and bitmap images. In this game, Canvas is used to draw the game grid, snakes, food items, and visual effects. Performance optimizations like double buffering (using an offscreen canvas) help achieve smooth rendering even during fast-paced gameplay.</p>
+                </div>
+            </div>
+
+            <div class="note">
+                <p>This tech stack combines frontend and backend JavaScript technologies to create a seamless, real-time multiplayer gaming experience across different devices and browsers.</p>
+            </div>
         </section>
     </div>
 
