@@ -1,7 +1,7 @@
 # 🐍 Multiplayer Snake Competition
 
 <p align="center">
-  <img src="https://amarmax.duckdns.org:10556/images/logo.png" alt="Snake Game Logo" width="200">
+  <img src="./assets/images/logo.png" alt="Snake Game Logo" width="200">
 </p>
 
 <p align="center">
@@ -37,6 +37,12 @@ A real-time multiplayer Snake game where players can compete against each other 
 - Node.js (v14+)
 - npm or yarn
 - SSL certificates (for production deployment)
+
+## 📸 Screenshots & Demo
+
+<p align="center">
+  <img src="./assets/images/gameplay.png" alt="Gameplay Screenshot" width="600">
+</p>
 
 ## 🔧 Installation
 
@@ -115,8 +121,6 @@ pm2 save
 pm2 resurrect
 ```
 
-See our [PM2 documentation](DEPLOYMENT.md) for more commands and details.
-
 ## 🎮 How to Play
 
 1. Enter your name and game room ID (or use the default)
@@ -126,18 +130,12 @@ See our [PM2 documentation](DEPLOYMENT.md) for more commands and details.
 5. Avoid collisions with walls and other snakes
 6. Last snake standing wins!
 
-## 📸 Screenshots & Demo
-
-<p align="center">
-  <img src="screenshots/gameplay.png" alt="Gameplay Screenshot" width="600">
-</p>
-
 ## 👨‍💻 The Team
 
 We're the enthusiastic developers behind this multiplayer Snake game!
 
 <p align="center">
-  <img src="team-photo.jpg" alt="Team Photo - Developers with 'I like snake game' sign" width="600">
+  <img src="assets/amar_max_max_3.png" alt="Team Photo - Developers with 'I like snake game' sign" width="600">
 </p>
 
 Our team consists of:
