@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Snake Game - Code Explanation</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --secondary: #8BC34A;
+            --dark: #2E7D32;
+            --light: #C8E6C9;
+            --accent: #FF5722;
+            --background: #121212;
+            --panel: #1E1E1E;
+            --text: #FFFFFF;
+            --code-bg: #2D2D2D;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background-color: var(--panel);
+            padding: 20px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        nav a {
+            padding: 10px 20px;
+            background-color: var(--dark);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        nav a:hover {
+            background-color: var(--primary);
+        }
+
+        .section {
+            background-color: var(--panel);
+            margin: 30px 0;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin: 20px 0 10px;
+            color: var(--secondary);
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        code {
+            background-color: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-bottom: 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .code-example {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .feature-card h4 {
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+
+        .tech-used {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .tech-badge {
+            background-color: var(--dark);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .img-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background-color: var(--dark);
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        @media (max-width: 768px) {
+            nav {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .feature-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .note {
+            background-color: rgba(76, 175, 80, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .warning {
+            background-color: rgba(255, 87, 34, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            margin-top: 50px;
+            background-color: var(--panel);
+            border-top: 2px solid var(--primary);
+        }
+
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary);
+            color: white;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            text-decoration: none;
+            font-size: 1.5em;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.3s;
+        }
+
+        .back-to-top:hover {
+            background-color: var(--dark);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Multiplayer Snake Game - Code Explanation</h1>
+        <nav>
+            <a href="#overview">Overview</a>
+            <a href="#client">Client (game.js)</a>
+            <a href="#ui">UI (index.html)</a>
+            <a href="#server">Server (server.js)</a>
+            <a href="#architecture">Architecture</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <section id="overview" class="section">
+            <h2>Project Overview</h2>
+            <p>This is a multiplayer Snake game with real-time gameplay using WebSockets. Players can create or join game rooms, control their snake, and compete against other players. The game features a grace period at the start, collision detection, and score tracking.</p>
+
+            <div class="tech-used">
+                <span class="tech-badge">HTML5</span>
+                <span class="tech-badge">CSS3</span>
+                <span class="tech-badge">JavaScript</span>
+                <span class="tech-badge">Node.js</span>
+                <span class="tech-badge">Express</span>
+                <span class="tech-badge">Socket.IO</span>
+                <span class="tech-badge">Canvas API</span>
+            </div>
+
+            <h3>Key Features</h3>
+            <div class="feature-list">
+                <div class="feature-card">
+                    <h4>Multiplayer Support</h4>
+                    <p>Up to 3 players can join a game room and play simultaneously</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Room System</h4>
+                    <p>Players can create or join specific game rooms via room IDs</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Real-time Updates</h4>
+                    <p>Game state syncs across all clients using WebSockets</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Responsive Design</h4>
+                    <p>Mobile-friendly with touch controls for small screens</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Grace Period</h4>
+                    <p>3-second grace period at game start to prevent early collisions</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Optimized Rendering</h4>
+                    <p>Double buffering and performance optimizations for smooth gameplay</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="section">
+            <h2>System Architecture</h2>
+            <p>The game follows a client-server architecture with WebSocket communication:</p>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>File</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Client Game Logic</td>
+                            <td><code>game.js</code></td>
+                            <td>Handles rendering, input, and communication with server</td>
+                        </tr>
+                        <tr>
+                            <td>User Interface</td>
+                            <td><code>index.html</code></td>
+                            <td>HTML structure and CSS styling for the game interface</td>
+                        </tr>
+                        <tr>
+                            <td>Server</td>
+                            <td><code>server.js</code></td>
+                            <td>Manages game state, handles player connections, and runs game logic</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Communication Flow</h3>
+            <ol>
+                <li>Client connects to server via Socket.IO</li>
+                <li>Player joins/creates a game room</li>
+                <li>Server initializes player and sends current game state</li>
+                <li>During gameplay, client sends direction changes to server</li>
+                <li>Server processes game logic (movement, collisions, food) and broadcasts updates</li>
+                <li>All clients render the updated game state</li>
+            </ol>
+        </section>
+
+        <section id="client" class="section">
+            <h2>Client-Side Code (game.js)</h2>
+            
+            <h3>Game Constants and Setup</h3>
+            <p>The game.js file begins by defining constants and game elements:</p>
+            <div class="code-example">
+                <pre>
+const GRID_SIZE = 30;
+const CELL_SIZE = 20;
+const GRACE_PERIOD_SECONDS = 3;
+
+// Game elements from DOM
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');</pre>
+            </div>
+            <p>Key points:</p>
+            <ul>
+                <li>The game grid is 30×30 cells, with each cell being 20px square</li>
+                <li>A 3-second grace period prevents early collisions</li>
+                <li>Canvas elements are used for rendering the game</li>
+            </ul>
+
+            <h3>Rendering Optimization</h3>
+            <p>Double buffering is implemented for smoother rendering:</p>
+            <div class="code-example">
+                <pre>
+// Create an off-screen canvas for double buffering
+const offscreenCanvas = document.createElement('canvas');
+offscreenCanvas.width = canvas.width;
+offscreenCanvas.height = canvas.height;
+const offscreenCtx = offscreenCanvas.getContext('2d');</pre>
+            </div>
+            <p>This technique reduces flickering by drawing everything to an offscreen canvas first, then copying it to the visible canvas in a single operation.</p>
+
+            <h3>Game State Management</h3>
+            <p>The client maintains a local copy of the game state that gets synchronized with the server:</p>
+            <div class="code-example">
+                <pre>
+let gameState = {
+    players: {},
+    food: [],
+    running: false,
+    ticksSinceStart: 0,
+    graceSeconds: 0
+};</pre>
+            </div>
+
+            <h3>Socket.IO Communication</h3>
+            <p>The client uses Socket.IO to connect to the server and handle various game events:</p>
+            <div class="code-example">
+                <pre>
+function connectToServer() {
+    socket = io('https://amarmax.duckdns.org:10556');
+    
+    socket.on('connect', () => {
+        connectionStatus.textContent = 'Connected';
+        // ...
+    });
+    
+    socket.on('gameState', (state) => {
+        gameState = state;
+        // ...
+    });
+    
+    // Other event handlers...</pre>
+            </div>
+            <p>Key socket events:</p>
+            <ul>
+                <li><code>connect/disconnect</code>: Handle connection status changes</li>
+                <li><code>gameState/gameUpdate</code>: Receive initial and updated game state</li>
+                <li><code>playerJoined/playerLeft</code>: Handle player joining/leaving</li>
+                <li><code>gameStarted/gameReset/gameOver</code>: Handle game lifecycle events</li>
+            </ul>
+
+            <h3>Animation and Rendering</h3>
+            <p>The game uses requestAnimationFrame for smooth animation:</p>
+            <div class="code-example">
+                <pre>
+function startAnimationLoop() {
+    // Cancel any existing animation loop
+    stopAnimationLoop();
+    
+    if (isAnimating) return;
+    isAnimating = true;
+    
+    const targetFPS = 60;
+    const frameInterval = 1000 / targetFPS;
+    let lastFrameTime = 0;
+
+    function animate(timestamp) {
+        if (!isAnimating) return;
+        
+        const elapsed = timestamp - lastFrameTime;
+        
+        if (elapsed > frameInterval || pendingStateUpdate) {
+            lastFrameTime = timestamp - (elapsed % frameInterval);
+            draw();
+        }
+        
+        animationFrame = requestAnimationFrame(animate);
+    }
+
+    animationFrame = requestAnimationFrame(animate);
+}</pre>
+            </div>
+            <p>The animation loop optimizes rendering by only drawing frames when needed, maintaining a consistent frame rate.</p>
+
+            <h3>Drawing Function</h3>
+            <p>The <code>draw()</code> function renders the current game state to the canvas:</p>
+            <div class="code-example">
+                <pre>
+function draw() {
+    // Draw to offscreen canvas first
+    offscreenCtx.fillStyle = '#1E1E1E';
+    offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+
+    // Draw grid lines
+    // Draw food
+    // Draw snakes
+    
+    // Copy to visible canvas in one operation
+    ctx.drawImage(offscreenCanvas, 0, 0);
+}</pre>
+            </div>
+            <p>The drawing process includes:</p>
+            <ul>
+                <li>Drawing the background and grid</li>
+                <li>Rendering food items with visual effects</li>
+                <li>Drawing each snake segment with rounded corners</li>
+                <li>Adding eyes to snake heads based on direction</li>
+            </ul>
+
+            <h3>Input Handling</h3>
+            <p>The game captures keyboard inputs to control snake direction:</p>
+            <div class="code-example">
+                <pre>
+document.addEventListener('keydown', function(e) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        handleDirectionChange(e.key);
+    }
+});</pre>
+            </div>
+            <p>For mobile devices, touch controls are added:</p>
+            <div class="code-example">
+                <pre>
+function addTouchControls() {
+    const touchControls = document.createElement('div');
+    touchControls.className = 'touch-controls';
+    // Add touch control buttons and event handlers
+}</pre>
+            </div>
+
+            <h3>UI State Management</h3>
+            <p>The client handles various UI states:</p>
+            <ul>
+                <li>Displaying scores and player counts</li>
+                <li>Updating button states based on game status</li>
+                <li>Showing grace period indicators</li>
+                <li>Displaying game over overlays</li>
+            </ul>
+        </section>
+
+        <section id="ui" class="section">
+            <h2>User Interface (index.html)</h2>
+            
+            <h3>HTML Structure</h3>
+            <p>The index.html file defines the game's interface with several key components:</p>
+            <ul>
+                <li>Game canvas where the action happens</li>
+                <li>Controls panel with game buttons</li>
+                <li>Scores panel to display player rankings</li>
+                <li>Join game overlay for entering name and room ID</li>
+                <li>Game over overlay for displaying results</li>
+            </ul>
+
+            <h3>CSS Styling</h3>
+            <p>The styling uses CSS variables for consistent theming:</p>
+            <div class="code-example">
+                <pre>
+:root {
+    --primary: #4CAF50;
+    --secondary: #8BC34A;
+    --dark: #2E7D32;
+    --light: #C8E6C9;
+    --accent: #FF5722;
+    --background: #121212;
+    --panel: #1E1E1E;
+    --text: #FFFFFF;
+}</pre>
+            </div>
+            <p>Key styling features:</p>
+            <ul>
+                <li>Dark theme with green accents for a retro gaming feel</li>
+                <li>Responsive design that adapts to different screen sizes</li>
+                <li>Modular components with consistent styling</li>
+                <li>Visual feedback for user interactions (hover states, transitions)</li>
+            </ul>
+
+            <h3>Key UI Components</h3>
+            
+            <h4>1. Game Container</h4>
+            <div class="code-example">
+                <pre>
+&lt;div class="game-container"&gt;
+    &lt;canvas id="game-canvas" width="600" height="600"&gt;&lt;/canvas&gt;
+    
+    &lt;div class="controls-panel"&gt;
+        &lt;!-- Controls and info --&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</pre>
+            </div>
+
+            <h4>2. Controls Panel</h4>
+            <div class="code-example">
+                <pre>
+&lt;div class="controls-panel"&gt;
+    &lt;div class="control-group"&gt;
+        &lt;h2&gt;Game Info&lt;/h2&gt;
+        &lt;p&gt;Room ID: &lt;span id="room-id-display"&gt;-&lt;/span&gt;&lt;/p&gt;
+        &lt;p&gt;Players: &lt;span id="player-count"&gt;0&lt;/span&gt;/3&lt;/p&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="control-group"&gt;
+        &lt;h2&gt;Controls&lt;/h2&gt;
+        &lt;button id="start-btn" disabled&gt;Start Game&lt;/button&gt;
+        &lt;button id="reset-btn" disabled&gt;Reset Game&lt;/button&gt;
+        &lt;button id="new-room-btn"&gt;New Game Room&lt;/button&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="control-group"&gt;
+        &lt;h2&gt;How to Play&lt;/h2&gt;
+        &lt;p&gt;Use arrow keys to control your snake.&lt;/p&gt;
+        &lt;!-- Instructions --&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</pre>
+            </div>
+
+            <h4>3. Overlays</h4>
+            <div class="code-example">
+                <pre>
+&lt;div id="join-game-overlay"&gt;
+    &lt;div id="join-game-form"&gt;
+        &lt;h2&gt;Join Snake Competition&lt;/h2&gt;
+        &lt;label for="player-name"&gt;Your Name:&lt;/label&gt;
+        &lt;input type="text" id="player-name" maxlength="15" placeholder="Enter your name"&gt;
+        
+        &lt;label for="game-id"&gt;Game Room ID:&lt;/label&gt;
+        &lt;input type="text" id="game-id" value="default-room" placeholder="Enter game room ID"&gt;
+        
+        &lt;button id="join-btn"&gt;Join Game&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div id="game-over-overlay"&gt;
+    &lt;div id="game-over-message"&gt;Game Over&lt;/div&gt;
+    &lt;div id="winner-message"&gt;&lt;/div&gt;
+    &lt;button id="play-again-btn"&gt;Play Again&lt;/button&gt;
+&lt;/div&gt;</pre>
+            </div>
+        </section>
+
+        <section id="server" class="section">
+            <h2>Server-Side Code (server.js)</h2>
+            
+            <h3>Server Setup</h3>
+            <p>The server.js file sets up an Express server with Socket.IO for real-time communication:</p>
+            <div class="code-example">
+                <pre>
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const path = require('path');
+const cors = require('cors');
+const fs = require('fs');
+const https = require('https');
+
+// Create Express app
+const app = express();
+app.use(cors());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Set up HTTPS server with SSL certificates
+const options = {
+  key: fs.readFileSync('/home/stecher/multiplayer-snake/certificates/privkey.pem'),
+  cert: fs.readFileSync('/home/stecher/multiplayer-snake/certificates/fullchain.pem')
+};
+
+const server = https.createServer(options, app);
+
+// Initialize Socket.IO
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});</pre>
+            </div>
+            <p>Key points:</p>
+            <ul>
+                <li>Uses HTTPS for secure connections</li>
+                <li>Enables CORS for cross-origin requests</li>
+                <li>Serves static files from the public directory</li>
+                <li>Configures Socket.IO with appropriate CORS settings</li>
+            </ul>
+
+            <h3>Game State Management</h3>
+            <p>The server maintains multiple game instances, each identified by a unique game ID:</p>
+            <div class="code-example">
+                <pre>
+// Game constants
+const GRID_SIZE = 30;
+const GAME_SPEED = 100; // ms
+const MAX_PLAYERS = 3;
+const GRACE_PERIOD_SECONDS = 3;
+const GRACE_PERIOD_TICKS = GRACE_PERIOD_SECONDS * (1000 / GAME_SPEED);
+const MAX_FOOD = 3;
+
+// Color constants
+const PLAYER_COLORS = ['#6EE766', '#FF5252', '#42AAFF']; // Green, Red, Blue
+
+// Game state
+const games = {};
+const playerSockets = {};</pre>
+            </div>
+            <p>Each game room has:</p>
+            <ul>
+                <li>Players with their snake data</li>
+                <li>Food items</li>
+                <li>Game state flags (running, gameOver)</li>
+                <li>Game interval for the update loop</li>
+                <li>Color assignments for players</li>
+                <li>Tick counter for the grace period</li>
+            </ul>
+
+            <h3>Socket Connection Handling</h3>
+            <p>The server listens for socket connections and handles various game events:</p>
+            <div class="code-example">
+                <pre>
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+
+    // Handle player joining a game
+    socket.on('joinGame', (data) => {
+        // Create or join game room logic
+    });
+
+    // Handle direction changes
+    socket.on('changeDirection', (direction) => {
+        // Update player direction
+    });
+
+    // Handle game start request
+    socket.on('startGame', () => {
+        // Start game logic
+    });
+
+    // Handle game reset request
+    socket.on('resetGame', () => {
+        // Reset game logic
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        // Clean up player data
+    });
+});</pre>
+            </div>
+            <p>Key socket events handled:</p>
+            <ul>
+                <li><code>joinGame</code>: Create or join a game room</li>
+                <li><code>changeDirection</code>: Update a player's snake direction</li>
+                <li><code>startGame</code>: Start the game loop</li>
+                <li><code>resetGame</code>: Reset the game state</li>
+                <li><code>disconnect</code>: Handle player disconnection</li>
+            </ul>
+
+            <h3>Game Loop</h3>
+            <p>The server runs a game loop at a fixed interval to update the game state:</p>
+            <div class="code-example">
+                <pre>
+function updateGame(gameId) {
+    const game = games[gameId];
+    if (!game || !game.running) return;
+
+    // Increment tick counter
+    game.ticksSinceStart++;
+    
+    // Create food if needed
+    // Update each player's snake
+    // Check for collisions
+    // Update scores
+    // Check for game over
+    
+    // Send updated state to clients
+    io.to(gameId).emit('gameUpdate', {
+        players: game.players,
+        food: game.food,
+        running: game.running,
+        ticksSinceStart: game.ticksSinceStart,
+        graceSeconds: getRemainingGraceSeconds(game.ticksSinceStart)
+    });
+}</pre>
+            </div>
+            <p>The game loop includes:</p>
+            <ul>
+                <li>Moving snakes based on their direction</li>
+                <li>Checking for wall and snake collisions</li>
+                <li>Detecting food consumption and scoring</li>
+                <li>Spawning new food as needed</li>
+                <li>Determining when the game is over</li>
+                <li>Broadcasting updated game state to all clients</li>
+            </ul>
+
+            <h3>Grace Period Implementation</h3>
+            <p>The game includes a grace period at the start to prevent early collisions:</p>
+            <div class="code-example">
+                <pre>
+// Only check for game over after the grace period
+if (game.ticksSinceStart > GRACE_PERIOD_TICKS) {
+    // Check for collisions with other snakes
+    // Check if game is over
+}</pre>
+            </div>
+            <p>During the grace period:</p>
+            <ul>
+                <li>Collisions between snakes are ignored</li>
+                <li>Players can move freely to position themselves</li>
+                <li>A countdown timer is displayed to players</li>
+            </ul>
+
+            <h3>Helper Functions</h3>
+            <p>Several helper functions manage game mechanics:</p>
+            <ul>
+                <li><code>createNewGame()</code>: Initialize a new game room</li>
+                <li><code>createFood()</code>: Generate food at random empty positions</li>
+                <li><code>isEmptyCell()</code>: Check if a cell is unoccupied</li>
+                <li><code>createPlayerSnake()</code>: Create a new snake for a player</li>
+                <li><code>resetGameState()</code>: Reset the game after game over</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Key Implementation Details</h2>
+
+            <h3>Snake Movement</h3>
+            <p>Snake movement follows these steps:</p>
+            <ol>
+                <li>Client sends direction changes to the server via <code>changeDirection</code> event</li>
+                <li>Server validates the direction (can't move directly opposite to current direction)</li>
+                <li>Server updates the snake's direction in the game state</li>
+                <li>On each game tick, the server calculates new positions for all snakes</li>
+                <li>New positions are broadcast to all clients as part of the game state</li>
+                <li>Clients render snakes at their updated positions</li>
+            </ol>
+
+            <h3>Collision Detection</h3>
+            <p>The server handles three types of collisions:</p>
+            <ol>
+                <li><strong>Wall collisions:</strong> When a snake's head moves outside the grid boundaries</li>
+                <li><strong>Snake-to-snake collisions:</strong> When a snake's head hits another snake's body</li>
+                <li><strong>Food collisions:</strong> When a snake's head overlaps with a food item</li>
+            </ol>
+            <p>Collision results:</p>
+            <ul>
+                <li>Wall or snake collision: Player dies (<code>snake.alive = false</code>)</li>
+                <li>Food collision: Snake grows longer and player score increases</li>
+            </ul>
+
+            <h3>Optimization Techniques</h3>
+            <p>Several optimizations improve performance:</p>
+            <ul>
+                <li><strong>Double buffering:</strong> Drawing to an offscreen canvas first, then copying to the visible canvas</li>
+                <li><strong>State comparison:</strong> Only sending updates when the game state changes</li>
+                <li><strong>Animation frame limiting:</strong> Targeting 60 FPS with optimized rendering</li>
+                <li><strong>Visibility detection:</strong> Pausing animation when tab is not visible</li>
+            </ul>
+
+            <h3>Mobile Support</h3>
+            <p>Mobile device support includes:</p>
+            <ul>
+                <li>Responsive design for different screen sizes</li>
+                <li>Touch controls for devices without keyboards</li>
+                <li>Device detection to show/hide appropriate controls</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>Conclusion</h2>
+            <p>This multiplayer Snake game demonstrates:</p>
+            <ul>
+                <li>Real-time client-server communication with Socket.IO</li>
+                <li>HTML5 Canvas for game rendering</li>
+                <li>Efficient game state management</li>
+                <li>Responsive design for multiple devices</li>
+                <li>Performance optimizations for smooth gameplay</li>
+            </ul>
+            <p>The code is organized into three main components:</p>
+            <ul>
+                <li><strong>Client-side logic (game.js):</strong> Handles rendering, input, and socket communication</li>
+                <li><strong>User interface (index.html):</strong> Provides the game's structure and styling</li>
+                <li><strong>Server-side logic (server.js):</strong> Manages game state, player connections, and game mechanics</li>
+            </ul>
+            <p>This architecture allows for a smooth multiplayer experience where players can create or join game rooms, compete against each other, and see real-time updates across all connected clients.</p>
+        </section>
+    </div>
+
+    <footer>
+        <p>© 2025 - Multiplayer Snake Game Code Explanation</p>
+    </footer>
+
+    <a href="#" class="back-to-top">↑</a>
+
+    <script>
+        document.querySelectorAll('nav a').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                window.scrollTo({
+                    top: targetElement.offsetTop - 80,
+                    behavior: 'smooth'
+                });
+            });
+        });
+        
+        document.querySelector('.back-to-top').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    </script>
+</body>
+</html>
