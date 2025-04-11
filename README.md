@@ -135,7 +135,7 @@ pm2 resurrect
 We're the enthusiastic developers behind this multiplayer Snake game!
 
 <p align="center">
-  <img src="assets/amar_max_max_3.png" alt="Team Photo - Developers with 'I like snake game' sign" width="600">
+  <img src="./assets/amar_max_max_3.png" alt="Team Photo - Developers with 'I like snake game' sign" width="600">
 </p>
 
 Our team consists of:
