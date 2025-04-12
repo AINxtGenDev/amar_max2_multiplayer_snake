@@ -68,7 +68,7 @@ A real-time multiplayer Snake game where players can compete against each other 
 
 ## 🚀 Deployment with PM2
 
-For production deployment, we recommend using PM2 to manage the Node.js process.
+For production deployment, I recommend using PM2 to manage the Node.js process.
 
 ### Basic Commands
 ```bash
