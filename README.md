@@ -1,7 +1,7 @@
 # 🐍 Multiplayer Snake Competition
 
 <p align="center">
-  <img src="./assets/images/logo.png" alt="Snake Game Logo" width="200">
+  <img src="./assets/lucky_duck_2.png" alt="Snake Game Logo" width="200">
 </p>
 
 <p align="center">
@@ -41,7 +41,7 @@ A real-time multiplayer Snake game where players can compete against each other 
 ## 📸 Screenshots & Demo
 
 <p align="center">
-  <img src="./assets/images/gameplay.png" alt="Gameplay Screenshot" width="600">
+  <img src="./assets/game_screenshot.png" alt="Gameplay Screenshot" width="600">
 </p>
 
 ## 🔧 Installation
