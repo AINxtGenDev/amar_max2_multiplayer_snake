@@ -38,7 +38,7 @@ A real-time multiplayer Snake game where players can compete against each other 
 - npm or yarn
 - SSL certificates (for production deployment)
 
-## 📸 Screenshots & Demo
+## 📸 Screenshots
 
 <p align="center">
   <img src="./assets/game_screenshot.png" alt="Gameplay Screenshot" width="600">
