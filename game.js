@@ -1,4 +1,4 @@
-// WPL 15.04.2025 v1.3
+// WPL 15.04.2025 v1.4
 // Game constants
 const GRID_SIZE = 30;
 const CELL_SIZE = 20;
@@ -55,6 +55,7 @@ let lastDirection = null;
 let isAnimating = false; // Flag to ensure only one animation loop is running
 let pendingStateUpdate = false; // Flag to indicate a state update is pending
 let isReconnecting = false; // Flag to track if we're in a reconnection process
+let isCountdownActive = false; // Flag to track if countdown is active
 
 // Direction vectors
 const directions = {
@@ -156,6 +157,20 @@ function connectToServer() {
         }
     });
 
+    // Countdown event handling
+    socket.on('gameCountdown', (data) => {
+        debugLog('Countdown event received: ' + data.seconds);
+        
+        // Show the countdown UI
+        showServerCountdown(data.seconds);
+        
+        // Set countdown active flag
+        isCountdownActive = true;
+        
+        // Disable start button during countdown
+        startBtn.disabled = true;
+    });
+
     socket.on('playerJoined', (data) => {
         debugLog('Player joined event received');
         previousGameState = JSON.parse(JSON.stringify(gameState)); // Deep copy for comparison
@@ -190,6 +205,10 @@ function connectToServer() {
         gameState.running = true;
         gameState.ticksSinceStart = 0;
         isGameOver = false; // Clear game over state when a new game starts
+        isCountdownActive = false; // Clear countdown flag
+        
+        // Hide countdown if it's visible
+        hideCountdown();
         
         // Initialize grace period with server value or fallback to default
         if (data && data.graceSeconds !== undefined) {
@@ -213,6 +232,10 @@ function connectToServer() {
         gameState = state;
         gameRunning = false;
         isGameOver = false; // Clear game over state on reset
+        isCountdownActive = false; // Clear countdown flag
+        
+        // Hide countdown if it's visible
+        hideCountdown();
         
         // Set grace period seconds from server
         if (state.graceSeconds !== undefined) {
@@ -244,6 +267,11 @@ function connectToServer() {
         gameRunning = false;
         gameState.running = false;
         isGameOver = true; // Set game over state
+        isCountdownActive = false; // Clear countdown flag
+        
+        // Hide countdown if it's visible
+        hideCountdown();
+        
         updateButtonStates();
         hideGracePeriodIndicator();
 
@@ -279,13 +307,15 @@ function updateButtonStates() {
     // - There's at least one player
     // - Game is not running
     // - Game is not in "game over" state, or has been reset
-    startBtn.disabled = gameRunning || !(Object.keys(gameState.players).length > 0) || 
+    // - Countdown is not active
+    startBtn.disabled = gameRunning || isCountdownActive || !(Object.keys(gameState.players).length > 0) || 
                         (isGameOver && !gameRunning);
     
     // Reset button is enabled only if:
     // - Game is running OR
-    // - Game is in "game over" state
-    resetBtn.disabled = !gameRunning && !isGameOver;
+    // - Game is in "game over" state OR
+    // - Countdown is active
+    resetBtn.disabled = !gameRunning && !isGameOver && !isCountdownActive;
 }
 
 // Join existing game (used for reconnection)
@@ -299,8 +329,8 @@ function joinExistingGame() {
     roomIdDisplay.textContent = gameId;
 }
 
-// Show the countdown before starting the game
-function showCountdown(callback) {
+// Show the synchronized countdown from server
+function showServerCountdown(seconds) {
     let countdownOverlay = document.getElementById('countdown-overlay');
     
     if (!countdownOverlay) {
@@ -310,59 +340,63 @@ function showCountdown(callback) {
         countdownOverlay.className = 'countdown-overlay';
         document.body.appendChild(countdownOverlay);
         
-        // Add styles
-        const style = document.createElement('style');
-        style.textContent = `
-            .countdown-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 2000;
-            }
-            
-            .countdown-number {
-                font-size: 15rem;
-                color: white;
-                font-weight: bold;
-                text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
-                animation: pulse 0.8s infinite alternate;
-            }
-            
-            @keyframes pulse {
-                0% { transform: scale(1); opacity: 1; }
-                100% { transform: scale(1.1); opacity: 0.8; }
-            }
-        `;
-        document.head.appendChild(style);
+        // Add styles if not already added
+        if (!document.getElementById('countdown-styles')) {
+            const style = document.createElement('style');
+            style.id = 'countdown-styles';
+            style.textContent = `
+                .countdown-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 2000;
+                }
+                
+                .countdown-number {
+                    font-size: 15rem;
+                    color: white;
+                    font-weight: bold;
+                    text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
+                    animation: pulse 0.8s infinite alternate;
+                }
+                
+                @keyframes pulse {
+                    0% { transform: scale(1); opacity: 1; }
+                    100% { transform: scale(1.1); opacity: 0.8; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
     
-    // Create the countdown number element
-    const countdownNumber = document.createElement('div');
-    countdownNumber.className = 'countdown-number';
-    countdownOverlay.appendChild(countdownNumber);
+    // Update or create the countdown number element
+    let countdownNumber = document.getElementById('countdown-number');
+    if (!countdownNumber) {
+        countdownNumber = document.createElement('div');
+        countdownNumber.id = 'countdown-number';
+        countdownNumber.className = 'countdown-number';
+        countdownOverlay.appendChild(countdownNumber);
+    }
     
-    // Start from 5
-    let seconds = 5;
+    // Update the countdown number
     countdownNumber.textContent = seconds;
     
-    // Update the countdown every second
-    const interval = setInterval(() => {
-        seconds--;
-        
-        if (seconds <= 0) {
-            clearInterval(interval);
-            countdownOverlay.remove();
-            if (callback) callback();
-        } else {
-            countdownNumber.textContent = seconds;
-        }
-    }, 1000);
+    // Show the countdown
+    countdownOverlay.style.display = 'flex';
+}
+
+// Hide the countdown overlay
+function hideCountdown() {
+    const countdownOverlay = document.getElementById('countdown-overlay');
+    if (countdownOverlay) {
+        countdownOverlay.style.display = 'none';
+    }
 }
 
 // Show grace period indicator
@@ -770,15 +804,18 @@ startBtn.addEventListener('click', () => {
     // Disable button during countdown
     startBtn.disabled = true;
     
-    // Show countdown first, then start the game
-    showCountdown(() => {
-        socket.emit('startGame');
-    });
+    // Request a countdown from the server
+    socket.emit('startCountdown');
 });
 
 resetBtn.addEventListener('click', () => {
     debugLog('Reset button clicked');
     isGameOver = false; // Clear game over state when reset is clicked
+    isCountdownActive = false; // Clear countdown flag
+    
+    // Hide countdown if it's visible
+    hideCountdown();
+    
     socket.emit('resetGame');
     
     // Hide game over overlay if visible

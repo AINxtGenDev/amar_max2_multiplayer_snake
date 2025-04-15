@@ -1,4 +1,4 @@
-// WPL 11.04.2025 v1.2
+// WPL 15.04.2025 v1.4
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -35,6 +35,7 @@ const MAX_PLAYERS = 3;
 const GRACE_PERIOD_SECONDS = 3; // Grace period in seconds
 const GRACE_PERIOD_TICKS = GRACE_PERIOD_SECONDS * (1000 / GAME_SPEED); // Convert seconds to ticks
 const MAX_FOOD = 3; // Maximum food items on the grid at once
+const COUNTDOWN_SECONDS = 5; // 5 second countdown before game starts
 
 // Color constants - specifically set to these colors
 const PLAYER_COLORS = ['#6EE766', '#FF5252', '#42AAFF']; // Green, Red, Blue
@@ -57,7 +58,9 @@ function createNewGame(gameId) {
     lastUpdateTime: Date.now(), // Track last update time for consistent update rate
     dirtyState: true,     // Flag to track if state has changed and needs to be sent
     gameOver: false,      // Track if the game is in game over state
-    gameFullCounter: 0    // Counter to track reconnection attempts
+    gameFullCounter: 0,   // Counter to track reconnection attempts
+    countdownActive: false, // Flag to track if countdown is active
+    countdownTimer: null   // Timer for countdown
   };
 }
 
@@ -216,6 +219,73 @@ function logGameState(game) {
   }
 }
 
+// Start the countdown sequence for all players in a room
+function startGameCountdown(gameId) {
+  const game = games[gameId];
+  if (!game || game.running || game.countdownActive) return;
+  
+  // Set countdown active flag
+  game.countdownActive = true;
+  
+  console.log(`Starting countdown for game ${gameId}`);
+  
+  // Send initial countdown event
+  io.to(gameId).emit('gameCountdown', { seconds: COUNTDOWN_SECONDS });
+  
+  // Start with 5 seconds
+  let secondsLeft = COUNTDOWN_SECONDS - 1;
+  
+  // Set up countdown interval
+  game.countdownTimer = setInterval(() => {
+    if (secondsLeft > 0) {
+      // Send countdown update
+      io.to(gameId).emit('gameCountdown', { seconds: secondsLeft });
+      secondsLeft--;
+    } else {
+      // Countdown finished, start the game
+      clearInterval(game.countdownTimer);
+      game.countdownActive = false;
+      
+      // Actually start the game now
+      startGameAfterCountdown(game, gameId);
+    }
+  }, 1000);
+}
+
+// Function to actually start the game after countdown
+function startGameAfterCountdown(game, gameId) {
+  // Don't start if already running
+  if (game.running) return;
+  
+  // Reset game over state if start is requested
+  if (game.gameOver) {
+    game.gameOver = false;
+    game.gameFullCounter = 0;
+  }
+
+  // Reset tick counter for grace period
+  game.ticksSinceStart = 0;
+  
+  // Reset the "hasMovedSinceStart" flag for all players
+  for (const playerId in game.players) {
+    game.players[playerId].snake.hasMovedSinceStart = false;
+  }
+
+  game.running = true;
+  game.dirtyState = true; // Mark state as changed
+  game.lastUpdateTime = Date.now();
+
+  // Start game update loop
+  game.interval = setInterval(() => updateGame(gameId), GAME_SPEED);
+
+  console.log(`Game ${gameId} started after countdown`);
+
+  // Notify all players that game has started
+  io.to(gameId).emit('gameStarted', {
+    graceSeconds: GRACE_PERIOD_SECONDS
+  });
+}
+
 // Socket connection handling
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
@@ -247,6 +317,12 @@ io.on('connection', (socket) => {
         ticksSinceStart: game.ticksSinceStart,
         graceSeconds: getRemainingGraceSeconds(game.ticksSinceStart)
       });
+      
+      // If countdown is active, notify this player
+      if (game.countdownActive) {
+        // We can't know exact second, so just send 1 to show they joined during countdown
+        socket.emit('gameCountdown', { seconds: 1 });
+      }
       
       // If game is already running, notify this player
       if (game.running) {
@@ -313,6 +389,12 @@ io.on('connection', (socket) => {
       graceSeconds: getRemainingGraceSeconds(game.ticksSinceStart)
     });
     
+    // If countdown is active, notify this player
+    if (game.countdownActive) {
+      // We can't know exact second, so just send 1 to show they joined during countdown
+      socket.emit('gameCountdown', { seconds: 1 });
+    }
+    
     // If game is already running, notify this player
     if (game.running) {
       socket.emit('gameStarted');
@@ -350,7 +432,21 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle game start request
+  // Handle request to start countdown
+  socket.on('startCountdown', () => {
+    const gameId = playerSockets[socket.id];
+    if (!gameId || !games[gameId]) return;
+
+    const game = games[gameId];
+
+    // Don't start if already running or countdown is active
+    if (game.running || game.countdownActive) return;
+    
+    // Start the countdown
+    startGameCountdown(gameId);
+  });
+
+  // Handle game start request (this is now only used for direct starts without countdown)
   socket.on('startGame', () => {
     const gameId = playerSockets[socket.id];
     if (!gameId || !games[gameId]) return;
@@ -395,6 +491,13 @@ io.on('connection', (socket) => {
     if (game.interval) {
       clearInterval(game.interval);
       game.interval = null;
+    }
+    
+    // Stop countdown if it's active
+    if (game.countdownTimer) {
+      clearInterval(game.countdownTimer);
+      game.countdownTimer = null;
+      game.countdownActive = false;
     }
     
     // Reset player snakes to starting positions while keeping their colors
@@ -487,6 +590,10 @@ io.on('connection', (socket) => {
     if (activePlayerCount === 0) {
       if (game.interval) {
         clearInterval(game.interval);
+      }
+      // Clear countdown if active
+      if (game.countdownTimer) {
+        clearInterval(game.countdownTimer);
       }
       delete games[gameId];
       console.log(`Game ${gameId} removed - no players left`);
@@ -669,4 +776,5 @@ const PORT = process.env.PORT || 10555;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Grace period set to ${GRACE_PERIOD_SECONDS} seconds (${GRACE_PERIOD_TICKS} ticks)`);
+  console.log(`Countdown set to ${COUNTDOWN_SECONDS} seconds`);
 });
