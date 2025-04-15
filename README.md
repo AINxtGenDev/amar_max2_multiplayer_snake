@@ -19,7 +19,8 @@ A real-time multiplayer Snake game where players can compete against each other 
 
 - **Multiplayer Support**: Up to 3 players per game room
 - **Room System**: Create or join specific game rooms
-- **Grace Period**: 3-second countdown at game start to prevent early collisions
+- **Synchronized Countdown**: 5-second countdown visible to all players before game start
+- **Grace Period**: 3-second grace period after game start to prevent early collisions
 - **Real-time Updates**: Synchronized game state across all clients
 - **Responsive Design**: Mobile-friendly with touch controls
 - **Visual Feedback**: Game over screens, winner announcements, and score tracking
@@ -125,10 +126,13 @@ pm2 resurrect
 
 1. Enter your name and game room ID (or use the default)
 2. Wait for other players to join or start the game
-3. Control your snake with arrow keys (desktop) or touch controls (mobile)
-4. Collect food to grow your snake and score points
-5. Avoid collisions with walls and other snakes
-6. Last snake standing wins!
+3. When ready, press the "Start Game" button to begin a 5-second countdown
+4. All players will see the synchronized countdown before gameplay begins
+5. After countdown, a 3-second grace period starts where collisions are disabled
+6. Control your snake with arrow keys (desktop) or touch controls (mobile)
+7. Collect food to grow your snake and score points
+8. Avoid collisions with walls and other snakes
+9. Last snake standing wins!
 
 ## 👨‍💻 The Team
 
