@@ -57,12 +57,27 @@ let pendingStateUpdate = false; // Flag to indicate a state update is pending
 let isReconnecting = false; // Flag to track if we're in a reconnection process
 let isCountdownActive = false; // Flag to track if countdown is active
 
+// Client-side prediction for responsive controls
+let localPlayerState = null; // Store local player state for prediction
+let lastInputTime = 0; // Track when the last input was sent
+const INPUT_BUFFER_SIZE = 3; // Maximum number of inputs to buffer
+const inputQueue = []; // Queue to store pending inputs
+const MIN_INPUT_INTERVAL = 20; // Minimum time (ms) between input sends to avoid flooding
+
 // Direction vectors
 const directions = {
     up: { x: 0, y: -1 },
     right: { x: 1, y: 0 },
     down: { x: 0, y: 1 },
     left: { x: -1, y: 0 }
+};
+
+// Input key state tracking for responsive controls
+const keyState = {
+    ArrowUp: false,
+    ArrowDown: false,
+    ArrowLeft: false,
+    ArrowRight: false
 };
 
 // Debug helper function
@@ -73,7 +88,12 @@ function debugLog(message) {
 // Initialize connection to server
 function connectToServer() {
     // Use the correct server URL
-    socket = io('https://amarmax.duckdns.org:10556');
+    socket = io('https://amarmax.duckdns.org:10556', {
+        transports: ['websocket'], // Force WebSocket for better performance
+        reconnectionAttempts: 5,   // Limit reconnection attempts
+        reconnectionDelay: 1000,   // Start with a 1s delay
+        reconnectionDelayMax: 5000 // Max out at 5s delay
+    });
 
     // Connection events
     socket.on('connect', () => {
@@ -121,6 +141,11 @@ function connectToServer() {
             gameState.graceSeconds = 0;
         }
         
+        // Update local player state for client-side prediction
+        if (gameState.players && gameState.players[socket.id]) {
+            localPlayerState = JSON.parse(JSON.stringify(gameState.players[socket.id]));
+        }
+        
         updateScores();
         startAnimationLoop();
         
@@ -145,6 +170,11 @@ function connectToServer() {
         // Update grace period seconds from server
         if (state.graceSeconds !== undefined) {
             gameState.graceSeconds = state.graceSeconds;
+        }
+        
+        // Update local player state for client-side prediction
+        if (gameState.players && gameState.players[socket.id]) {
+            localPlayerState = JSON.parse(JSON.stringify(gameState.players[socket.id]));
         }
         
         updateScores();
@@ -179,6 +209,12 @@ function connectToServer() {
             gameState.running = data.running;
             gameRunning = data.running;
         }
+        
+        // Update local player state for client-side prediction
+        if (gameState.players && gameState.players[socket.id]) {
+            localPlayerState = JSON.parse(JSON.stringify(gameState.players[socket.id]));
+        }
+        
         updateScores();
 
         // Update player count
@@ -224,6 +260,9 @@ function connectToServer() {
         
         // Show starting message
         showStartingMessage();
+        
+        // Clear input queue when game starts
+        inputQueue.length = 0;
     });
     
     socket.on('gameReset', (state) => {
@@ -243,6 +282,14 @@ function connectToServer() {
         } else {
             gameState.graceSeconds = GRACE_PERIOD_SECONDS;
         }
+        
+        // Update local player state for client-side prediction
+        if (gameState.players && gameState.players[socket.id]) {
+            localPlayerState = JSON.parse(JSON.stringify(gameState.players[socket.id]));
+        }
+        
+        // Clear input queue
+        inputQueue.length = 0;
         
         updateButtonStates();
         hideGracePeriodIndicator();
@@ -279,6 +326,9 @@ function connectToServer() {
         previousGameState = JSON.parse(JSON.stringify(gameState)); // Deep copy for comparison
         gameState.players = data.players;
 
+        // Clear input queue
+        inputQueue.length = 0;
+        
         // Show game over message
         gameOverMessage.textContent = "Game Over";
 
@@ -511,8 +561,50 @@ function joinGame() {
     localStorage.setItem('playerName', playerName);
 }
 
+// Client-side prediction for immediate control response
+function applyClientPrediction() {
+    if (!gameRunning || !localPlayerState || !localPlayerState.snake || !localPlayerState.snake.alive) {
+        return;
+    }
+    
+    // Apply pending inputs from our queue to local state
+    while (inputQueue.length > 0) {
+        const direction = inputQueue[0];
+        
+        // Check if direction is valid (not opposite of current)
+        const currentDir = localPlayerState.snake.direction;
+        if (!((currentDir === 'up' && direction === 'down') ||
+            (currentDir === 'down' && direction === 'up') ||
+            (currentDir === 'left' && direction === 'right') ||
+            (currentDir === 'right' && direction === 'left'))) {
+            
+            // Update our local snake's direction
+            localPlayerState.snake.direction = direction;
+            localPlayerState.snake.pendingDirection = direction;
+        }
+        
+        // Remove this input from the queue
+        inputQueue.shift();
+    }
+    
+    // If we have a valid local player state, modify the gameState to use it
+    // for rendering our snake before the server responds
+    if (gameState.players && gameState.players[socket.id]) {
+        const serverSnake = gameState.players[socket.id].snake;
+        
+        // Only apply prediction if server hasn't already updated the direction
+        if (serverSnake.direction !== localPlayerState.snake.direction) {
+            serverSnake.direction = localPlayerState.snake.direction;
+            serverSnake.pendingDirection = localPlayerState.snake.pendingDirection;
+        }
+    }
+}
+
 // Draw the game using double buffering to reduce flickering
 function draw() {
+    // Apply client prediction before drawing
+    applyClientPrediction();
+    
     // Always draw to the offscreen canvas first
     offscreenCtx.fillStyle = '#1E1E1E';
     offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -739,6 +831,9 @@ function startAnimationLoop() {
             draw();
         }
         
+        // Process input every frame for responsive controls
+        processInputs();
+        
         animationFrame = requestAnimationFrame(animate);
     }
 
@@ -746,9 +841,50 @@ function startAnimationLoop() {
     animationFrame = requestAnimationFrame(animate);
 }
 
+// Process keyboard inputs every frame for responsive controls
+function processInputs() {
+    if (!gameRunning) return;
+    
+    // Check if player exists and is alive
+    if (!gameState.players || !gameState.players[socket.id] || !gameState.players[socket.id].snake.alive) {
+        return;
+    }
+    
+    // Get current direction
+    const currentDirection = gameState.players[socket.id].snake.direction;
+    
+    // Determine which key is pressed (prioritize newest key press)
+    let newDirection = null;
+    
+    if (keyState.ArrowUp && currentDirection !== 'down') {
+        newDirection = 'up';
+    } else if (keyState.ArrowRight && currentDirection !== 'left') {
+        newDirection = 'right';
+    } else if (keyState.ArrowDown && currentDirection !== 'up') {
+        newDirection = 'down';
+    } else if (keyState.ArrowLeft && currentDirection !== 'right') {
+        newDirection = 'left';
+    }
+    
+    // Only send if the direction is different and we're not sending too frequently
+    if (newDirection && 
+        newDirection !== currentDirection && 
+        newDirection !== lastDirection &&
+        Date.now() - lastInputTime > MIN_INPUT_INTERVAL) {
+        
+        sendDirectionChange(newDirection);
+        lastInputTime = Date.now();
+        
+        // Add to input queue for client prediction
+        if (inputQueue.length < INPUT_BUFFER_SIZE) {
+            inputQueue.push(newDirection);
+        }
+    }
+}
+
 // Send direction change to server
 function sendDirectionChange(direction) {
-    if (!socket) return;
+    if (!socket || !gameRunning) return;
 
     // Only send if direction is different from last sent
     if (direction !== lastDirection) {
@@ -758,40 +894,17 @@ function sendDirectionChange(direction) {
     }
 }
 
-// Handle direction changes based on keyboard input
-function handleDirectionChange(key) {
-    if (!gameRunning) {
-        debugLog('Game not running, ignoring direction change');
-        return;
+// Handle direction changes based on keyboard input (now updated for responsive controls)
+function handleKeyDown(e) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault(); // Prevent page scrolling
+        keyState[e.key] = true; // Set key state to true
     }
-    
-    // Check if player exists and is alive
-    if (!gameState.players || !gameState.players[socket.id] || !gameState.players[socket.id].snake.alive) {
-        debugLog('Player not alive, ignoring direction change');
-        return;
-    }
-    
-    let direction = null;
-    
-    switch (key) {
-        case 'ArrowUp':
-            direction = 'up';
-            break;
-        case 'ArrowRight':
-            direction = 'right';
-            break;
-        case 'ArrowDown':
-            direction = 'down';
-            break;
-        case 'ArrowLeft':
-            direction = 'left';
-            break;
-        default:
-            return; // Not an arrow key
-    }
-    
-    if (direction) {
-        sendDirectionChange(direction);
+}
+
+function handleKeyUp(e) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        keyState[e.key] = false; // Reset key state
     }
 }
 
@@ -847,14 +960,9 @@ playAgainBtn.addEventListener('click', () => {
     });
 });
 
-// Update player snake direction on arrow key press
-document.addEventListener('keydown', function(e) {
-    // Prevent default behavior for arrow keys to avoid page scrolling
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        e.preventDefault();
-        handleDirectionChange(e.key);
-    }
-});
+// Update player snake direction on arrow key press/release
+document.addEventListener('keydown', handleKeyDown);
+document.addEventListener('keyup', handleKeyUp);
 
 // Add touch controls for mobile devices
 function addTouchControls() {
@@ -871,11 +979,46 @@ function addTouchControls() {
     
     document.body.appendChild(touchControls);
     
-    // Add touch events
-    document.querySelector('.touch-control.up').addEventListener('click', () => handleDirectionChange('ArrowUp'));
-    document.querySelector('.touch-control.right').addEventListener('click', () => handleDirectionChange('ArrowRight'));
-    document.querySelector('.touch-control.down').addEventListener('click', () => handleDirectionChange('ArrowDown'));
-    document.querySelector('.touch-control.left').addEventListener('click', () => handleDirectionChange('ArrowLeft'));
+    // Updated touch controls for better responsiveness
+    const upBtn = document.querySelector('.touch-control.up');
+    const rightBtn = document.querySelector('.touch-control.right');
+    const downBtn = document.querySelector('.touch-control.down');
+    const leftBtn = document.querySelector('.touch-control.left');
+    
+    // Touch start events
+    upBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keyState.ArrowUp = true;
+    });
+    rightBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keyState.ArrowRight = true;
+    });
+    downBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keyState.ArrowDown = true;
+    });
+    leftBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keyState.ArrowLeft = true;
+    });
+    
+    // Touch end events
+    upBtn.addEventListener('touchend', () => { keyState.ArrowUp = false; });
+    rightBtn.addEventListener('touchend', () => { keyState.ArrowRight = false; });
+    downBtn.addEventListener('touchend', () => { keyState.ArrowDown = false; });
+    leftBtn.addEventListener('touchend', () => { keyState.ArrowLeft = false; });
+    
+    // Mouse events for testing on desktop
+    upBtn.addEventListener('mousedown', () => { keyState.ArrowUp = true; });
+    rightBtn.addEventListener('mousedown', () => { keyState.ArrowRight = true; });
+    downBtn.addEventListener('mousedown', () => { keyState.ArrowDown = true; });
+    leftBtn.addEventListener('mousedown', () => { keyState.ArrowLeft = true; });
+    
+    upBtn.addEventListener('mouseup', () => { keyState.ArrowUp = false; });
+    rightBtn.addEventListener('mouseup', () => { keyState.ArrowRight = false; });
+    downBtn.addEventListener('mouseup', () => { keyState.ArrowDown = false; });
+    leftBtn.addEventListener('mouseup', () => { keyState.ArrowLeft = false; });
     
     // Add styles
     const style = document.createElement('style');
@@ -907,9 +1050,11 @@ function addTouchControls() {
             color: white;
             user-select: none;
             cursor: pointer;
+            touch-action: none; /* Prevent browser handling of touches */
         }
         .touch-control:active {
             background-color: rgba(76, 175, 80, 1);
+            transform: scale(0.95);
         }
         @media (min-width: 769px) {
             .touch-controls {
@@ -959,11 +1104,17 @@ window.addEventListener('resize', () => {
     draw();
 });
 
-// Handle visibility change - pause animation when tab is not visible
+// Handle visibility change - optimize performance when tab is not visible
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         // Stop animation loop when tab is not visible to save resources
         stopAnimationLoop();
+        
+        // Reset key states to prevent stuck keys
+        keyState.ArrowUp = false;
+        keyState.ArrowDown = false;
+        keyState.ArrowLeft = false;
+        keyState.ArrowRight = false;
     } else {
         // Resume animation when tab becomes visible again
         startAnimationLoop();
