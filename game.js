@@ -1,4 +1,4 @@
-// WPL 11.04.2025 v1.2
+// WPL 15.04.2025 v1.3
 // Game constants
 const GRID_SIZE = 30;
 const CELL_SIZE = 20;
@@ -297,6 +297,72 @@ function joinExistingGame() {
     
     // Update UI
     roomIdDisplay.textContent = gameId;
+}
+
+// Show the countdown before starting the game
+function showCountdown(callback) {
+    let countdownOverlay = document.getElementById('countdown-overlay');
+    
+    if (!countdownOverlay) {
+        // Create the overlay element
+        countdownOverlay = document.createElement('div');
+        countdownOverlay.id = 'countdown-overlay';
+        countdownOverlay.className = 'countdown-overlay';
+        document.body.appendChild(countdownOverlay);
+        
+        // Add styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .countdown-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 2000;
+            }
+            
+            .countdown-number {
+                font-size: 15rem;
+                color: white;
+                font-weight: bold;
+                text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
+                animation: pulse 0.8s infinite alternate;
+            }
+            
+            @keyframes pulse {
+                0% { transform: scale(1); opacity: 1; }
+                100% { transform: scale(1.1); opacity: 0.8; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Create the countdown number element
+    const countdownNumber = document.createElement('div');
+    countdownNumber.className = 'countdown-number';
+    countdownOverlay.appendChild(countdownNumber);
+    
+    // Start from 5
+    let seconds = 5;
+    countdownNumber.textContent = seconds;
+    
+    // Update the countdown every second
+    const interval = setInterval(() => {
+        seconds--;
+        
+        if (seconds <= 0) {
+            clearInterval(interval);
+            countdownOverlay.remove();
+            if (callback) callback();
+        } else {
+            countdownNumber.textContent = seconds;
+        }
+    }, 1000);
 }
 
 // Show grace period indicator
@@ -700,7 +766,14 @@ joinBtn.addEventListener('click', joinGame);
 
 startBtn.addEventListener('click', () => {
     debugLog('Start button clicked');
-    socket.emit('startGame');
+    
+    // Disable button during countdown
+    startBtn.disabled = true;
+    
+    // Show countdown first, then start the game
+    showCountdown(() => {
+        socket.emit('startGame');
+    });
 });
 
 resetBtn.addEventListener('click', () => {
