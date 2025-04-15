@@ -1,4 +1,5 @@
 // WPL 15.04.2025 v1.4
+// fix both issues - the positioning of touch controls and the non-working Reset Game button on mobile.
 // Game constants
 const GRID_SIZE = 30;
 const CELL_SIZE = 20;
@@ -56,6 +57,8 @@ let isAnimating = false; // Flag to ensure only one animation loop is running
 let pendingStateUpdate = false; // Flag to indicate a state update is pending
 let isReconnecting = false; // Flag to track if we're in a reconnection process
 let isCountdownActive = false; // Flag to track if countdown is active
+let touchControlsInitialized = false; // Track if touch controls are initialized
+let resetRequestPending = false; // Track if a reset request is pending
 
 // Client-side prediction for responsive controls
 let localPlayerState = null; // Store local player state for prediction
@@ -80,9 +83,59 @@ const keyState = {
     ArrowRight: false
 };
 
-// Debug helper function
+// Debug helper function with timestamp
 function debugLog(message) {
-    console.log(`[DEBUG] ${message}`);
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+    console.log(`[DEBUG ${timestamp}] ${message}`);
+}
+
+// Mobile-specific debug helper
+function mobileDebug(message) {
+    debugLog(`[MOBILE] ${message}`);
+    
+    // On mobile, also display debug info in a small overlay for testing
+    if (isMobileDevice()) {
+        let debugOverlay = document.getElementById('mobile-debug-overlay');
+        if (!debugOverlay) {
+            debugOverlay = document.createElement('div');
+            debugOverlay.id = 'mobile-debug-overlay';
+            debugOverlay.style.position = 'fixed';
+            debugOverlay.style.bottom = '80px';
+            debugOverlay.style.left = '10px';
+            debugOverlay.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            debugOverlay.style.color = 'white';
+            debugOverlay.style.padding = '5px';
+            debugOverlay.style.fontSize = '10px';
+            debugOverlay.style.maxWidth = '150px';
+            debugOverlay.style.zIndex = '1000';
+            debugOverlay.style.overflowY = 'scroll';
+            debugOverlay.style.maxHeight = '100px';
+            document.body.appendChild(debugOverlay);
+        }
+        
+        const entry = document.createElement('div');
+        entry.textContent = `${message}`;
+        
+        // Keep only last 5 messages
+        if (debugOverlay.childElementCount >= 5) {
+            debugOverlay.removeChild(debugOverlay.firstChild);
+        }
+        
+        debugOverlay.appendChild(entry);
+    }
+}
+
+// Reset all key states - important for mobile
+function resetKeyStates() {
+    keyState.ArrowUp = false;
+    keyState.ArrowDown = false;
+    keyState.ArrowLeft = false;
+    keyState.ArrowRight = false;
+    lastDirection = null;
+    inputQueue.length = 0; // Clear input queue
+    
+    mobileDebug("Key states reset");
 }
 
 // Initialize connection to server
@@ -119,6 +172,9 @@ function connectToServer() {
         gameRunning = false; // Make sure to update the game state when disconnected
         isReconnecting = true; // Set flag to attempt reconnection
         stopAnimationLoop(); // Stop animation loop on disconnect
+        
+        // Reset input state
+        resetKeyStates();
     });
 
     // Game state events
@@ -154,6 +210,11 @@ function connectToServer() {
 
         // Force an immediate render to avoid initial flicker
         draw();
+        
+        // Ensure touch controls are initialized if on mobile
+        if (isMobileDevice() && !touchControlsInitialized) {
+            initTouchControls();
+        }
     });
 
     socket.on('gameUpdate', (state) => {
@@ -242,6 +303,7 @@ function connectToServer() {
         gameState.ticksSinceStart = 0;
         isGameOver = false; // Clear game over state when a new game starts
         isCountdownActive = false; // Clear countdown flag
+        resetRequestPending = false; // Reset the pending flag
         
         // Hide countdown if it's visible
         hideCountdown();
@@ -261,8 +323,14 @@ function connectToServer() {
         // Show starting message
         showStartingMessage();
         
-        // Clear input queue when game starts
-        inputQueue.length = 0;
+        // Reset input state when game starts
+        resetKeyStates();
+        
+        // Force touch controls re-initialization for mobile
+        if (isMobileDevice()) {
+            cleanupTouchControls();
+            initTouchControls();
+        }
     });
     
     socket.on('gameReset', (state) => {
@@ -272,6 +340,7 @@ function connectToServer() {
         gameRunning = false;
         isGameOver = false; // Clear game over state on reset
         isCountdownActive = false; // Clear countdown flag
+        resetRequestPending = false; // Reset the pending flag
         
         // Hide countdown if it's visible
         hideCountdown();
@@ -288,15 +357,26 @@ function connectToServer() {
             localPlayerState = JSON.parse(JSON.stringify(gameState.players[socket.id]));
         }
         
-        // Clear input queue
-        inputQueue.length = 0;
+        // Reset input state when game resets
+        resetKeyStates();
         
         updateButtonStates();
         hideGracePeriodIndicator();
         updateScores();
         
+        mobileDebug("Game reset received from server");
+        
         // Force an immediate render for reset
         draw();
+        
+        // Reinitialize touch controls for mobile
+        if (isMobileDevice()) {
+            mobileDebug("Reinitializing touch controls after reset");
+            setTimeout(() => {
+                cleanupTouchControls();
+                initTouchControls();
+            }, 100);
+        }
     });
 
     socket.on('gameFull', () => {
@@ -315,6 +395,7 @@ function connectToServer() {
         gameState.running = false;
         isGameOver = true; // Set game over state
         isCountdownActive = false; // Clear countdown flag
+        resetRequestPending = false; // Reset the pending flag
         
         // Hide countdown if it's visible
         hideCountdown();
@@ -326,8 +407,8 @@ function connectToServer() {
         previousGameState = JSON.parse(JSON.stringify(gameState)); // Deep copy for comparison
         gameState.players = data.players;
 
-        // Clear input queue
-        inputQueue.length = 0;
+        // Reset input state when game is over
+        resetKeyStates();
         
         // Show game over message
         gameOverMessage.textContent = "Game Over";
@@ -891,6 +972,57 @@ function sendDirectionChange(direction) {
         debugLog(`Sending direction change: ${direction}`);
         socket.emit('changeDirection', direction);
         lastDirection = direction;
+        
+        // Mobile debug
+        if (isMobileDevice()) {
+            mobileDebug(`Sent direction: ${direction}`);
+        }
+    }
+}
+
+// Send reset game request to server with safeguards against duplicate requests
+function sendResetGameRequest() {
+    if (resetRequestPending) {
+        mobileDebug("Reset already pending, ignoring");
+        return;
+    }
+    
+    mobileDebug("Sending reset game request");
+    resetRequestPending = true;
+    
+    // Force all touch controls to release
+    resetKeyStates();
+    
+    try {
+        // Send the reset request to server
+        socket.emit('resetGame');
+        
+        // On mobile, also add these extra steps to ensure reset works
+        if (isMobileDevice()) {
+            // Force UI update
+            updateButtonStates();
+            
+            // Clean up any UI elements
+            hideGracePeriodIndicator();
+            hideCountdown();
+            
+            // Force touch controls cleanup
+            cleanupTouchControls();
+            
+            // Reinitialize after a short delay
+            setTimeout(() => {
+                initTouchControls();
+                resetRequestPending = false;
+            }, 300);
+        } else {
+            // For desktop, reset pending flag after a short timeout
+            setTimeout(() => {
+                resetRequestPending = false;
+            }, 300);
+        }
+    } catch (e) {
+        console.error("Error sending reset request:", e);
+        resetRequestPending = false;
     }
 }
 
@@ -899,13 +1031,293 @@ function handleKeyDown(e) {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault(); // Prevent page scrolling
         keyState[e.key] = true; // Set key state to true
+        
+        // Mobile debug
+        if (isMobileDevice()) {
+            mobileDebug(`Key down: ${e.key}`);
+        }
     }
 }
 
 function handleKeyUp(e) {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         keyState[e.key] = false; // Reset key state
+        
+        // Mobile debug
+        if (isMobileDevice()) {
+            mobileDebug(`Key up: ${e.key}`);
+        }
     }
+}
+
+// Check if on mobile device
+const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+// Clean up touch controls by removing event listeners
+function cleanupTouchControls() {
+    mobileDebug("Cleaning up touch controls");
+    
+    // First, remove the existing touch controls container if it exists
+    const existingControls = document.querySelector('.touch-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+    
+    touchControlsInitialized = false;
+}
+
+// Initialize touch controls for mobile devices
+function initTouchControls() {
+    // First check if controls already exist and clean them up
+    cleanupTouchControls();
+    
+    mobileDebug("Initializing touch controls");
+    
+    // Create new touch controls container
+    const touchControls = document.createElement('div');
+    touchControls.className = 'touch-controls';
+    
+    // Add the buttons with unique IDs
+    touchControls.innerHTML = `
+        <div class="touch-control up" id="touch-up">▲</div>
+        <div class="touch-control-row">
+            <div class="touch-control left" id="touch-left">◀</div>
+            <div class="touch-control right" id="touch-right">▶</div>
+        </div>
+        <div class="touch-control down" id="touch-down">▼</div>
+    `;
+    
+    // Add styles
+    if (!document.getElementById('touch-controls-style')) {
+        const style = document.createElement('style');
+        style.id = 'touch-controls-style';
+        style.textContent = `
+            .touch-controls {
+                position: fixed;
+                top: 55%; /* Moved up from bottom */
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+                z-index: 1000;
+                padding-bottom: 20px;
+            }
+            .touch-control-row {
+                display: flex;
+                gap: 60px; /* Increased spacing */
+            }
+            .touch-control {
+                width: 80px; /* Larger buttons */
+                height: 80px;
+                background-color: rgba(76, 175, 80, 0.8); /* More opaque */
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 32px; /* Larger icons */
+                color: white;
+                user-select: none;
+                cursor: pointer;
+                touch-action: none; /* Prevent browser handling of touches */
+                -webkit-tap-highlight-color: transparent; /* Remove touch highlight */
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Add shadow for depth */
+                border: 2px solid rgba(255, 255, 255, 0.3); /* Add subtle border */
+            }
+            .touch-control:active, .touch-control.active {
+                background-color: rgba(76, 175, 80, 1);
+                transform: scale(0.95);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Pressed shadow */
+            }
+            @media (min-width: 769px) {
+                .touch-controls {
+                    display: none;
+                }
+            }
+            
+            /* Fix for the Reset Game button on mobile */
+            #reset-btn {
+                -webkit-tap-highlight-color: transparent;
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+                position: relative;
+                z-index: 100; /* Ensure it's above other elements */
+                transform: translateZ(0); /* Force hardware acceleration */
+            }
+            
+            #reset-btn:active::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(255, 255, 255, 0.2);
+                border-radius: 5px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Append the controls to the document
+    document.body.appendChild(touchControls);
+    
+    // Get elements after they're added to the DOM
+    const upBtn = document.getElementById('touch-up');
+    const rightBtn = document.getElementById('touch-right');
+    const downBtn = document.getElementById('touch-down');
+    const leftBtn = document.getElementById('touch-left');
+    
+    if (!upBtn || !rightBtn || !downBtn || !leftBtn) {
+        mobileDebug("Error: Could not find touch control elements");
+        return;
+    }
+    
+    // Helper function for handling touch/mouse events
+    const setupButton = (btn, direction, keyCode) => {
+        // Touch events
+        const touchStartHandler = (e) => {
+            e.preventDefault();
+            keyState[keyCode] = true;
+            btn.classList.add('active');
+            mobileDebug(`Touch start: ${direction}`);
+        };
+        
+        const touchEndHandler = (e) => {
+            e.preventDefault();
+            keyState[keyCode] = false;
+            btn.classList.remove('active');
+            mobileDebug(`Touch end: ${direction}`);
+        };
+        
+        const touchCancelHandler = (e) => {
+            keyState[keyCode] = false;
+            btn.classList.remove('active');
+            mobileDebug(`Touch cancel: ${direction}`);
+        };
+        
+        btn.addEventListener('touchstart', touchStartHandler, { passive: false });
+        btn.addEventListener('touchend', touchEndHandler, { passive: false });
+        btn.addEventListener('touchcancel', touchCancelHandler, { passive: false });
+        
+        // Mouse events for testing on desktop
+        btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            keyState[keyCode] = true;
+            btn.classList.add('active');
+        });
+        
+        btn.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            keyState[keyCode] = false;
+            btn.classList.remove('active');
+        });
+        
+        btn.addEventListener('mouseleave', (e) => {
+            if (keyState[keyCode]) {
+                keyState[keyCode] = false;
+                btn.classList.remove('active');
+            }
+        });
+    };
+    
+    // Set up each button with proper events
+    setupButton(upBtn, 'up', 'ArrowUp');
+    setupButton(rightBtn, 'right', 'ArrowRight');
+    setupButton(downBtn, 'down', 'ArrowDown');
+    setupButton(leftBtn, 'left', 'ArrowLeft');
+    
+    // Add a trap to catch lost touch events on body
+    document.body.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            // Reset all key states when no touches are on screen
+            resetKeyStates();
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.touch-control').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            mobileDebug("Body touchend: Reset all keys");
+        }
+    }, { passive: true });
+    
+    // Prevent page scrolling when touching controls
+    touchControls.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+    }, { passive: false });
+    
+    mobileDebug("Touch controls initialized");
+    touchControlsInitialized = true;
+    
+    // Add a debug button
+    if (!document.getElementById('mobile-debug-button')) {
+        const debugBtn = document.createElement('button');
+        debugBtn.id = 'mobile-debug-button';
+        debugBtn.innerText = 'Reset Controls';
+        debugBtn.style.position = 'fixed';
+        debugBtn.style.bottom = '5px';
+        debugBtn.style.right = '5px';
+        debugBtn.style.fontSize = '10px';
+        debugBtn.style.padding = '5px';
+        debugBtn.style.zIndex = '1001';
+        
+        debugBtn.addEventListener('click', () => {
+            resetKeyStates();
+            cleanupTouchControls();
+            initTouchControls();
+            mobileDebug("Controls reset manually");
+        });
+        
+        document.body.appendChild(debugBtn);
+    }
+}
+
+// Fix Reset Game button on mobile by adding multiple event types
+function fixResetButtonForMobile() {
+    if (!isMobileDevice()) return;
+    
+    mobileDebug("Fixing Reset Game button for mobile");
+    
+    // First, remove any existing event listeners by cloning and replacing
+    const originalBtn = document.getElementById('reset-btn');
+    if (!originalBtn) return;
+    
+    const newBtn = originalBtn.cloneNode(true);
+    originalBtn.parentNode.replaceChild(newBtn, originalBtn);
+    
+    // Add multiple event types for maximum reliability
+    newBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        mobileDebug("Reset button touchstart");
+        newBtn.classList.add('pressed');
+    }, { passive: false });
+    
+    newBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        mobileDebug("Reset button touchend");
+        newBtn.classList.remove('pressed');
+        sendResetGameRequest();
+    }, { passive: false });
+    
+    // Also keep click listener for backward compatibility
+    newBtn.addEventListener('click', (e) => {
+        mobileDebug("Reset button clicked");
+        sendResetGameRequest();
+    });
+    
+    // Add additional mouse events
+    newBtn.addEventListener('mousedown', () => {
+        newBtn.classList.add('pressed');
+    });
+    
+    newBtn.addEventListener('mouseup', () => {
+        newBtn.classList.remove('pressed');
+    });
 }
 
 // Event listeners
@@ -921,21 +1333,25 @@ startBtn.addEventListener('click', () => {
     socket.emit('startCountdown');
 });
 
+// Reset button uses the enhanced handler for mobile compatibility
 resetBtn.addEventListener('click', () => {
     debugLog('Reset button clicked');
-    isGameOver = false; // Clear game over state when reset is clicked
-    isCountdownActive = false; // Clear countdown flag
-    
-    // Hide countdown if it's visible
-    hideCountdown();
-    
-    socket.emit('resetGame');
-    
-    // Hide game over overlay if visible
-    if (gameOverOverlay.classList.contains('visible')) {
-        gameOverOverlay.classList.remove('visible');
-    }
+    sendResetGameRequest();
 });
+
+// Mobile devices need extra handlers for the reset button
+if (isMobileDevice()) {
+    resetBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        mobileDebug("Reset button touchstart");
+    }, { passive: false });
+    
+    resetBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        mobileDebug("Reset button touchend");
+        sendResetGameRequest();
+    }, { passive: false });
+}
 
 newRoomBtn.addEventListener('click', () => {
     // Generate random room ID
@@ -950,125 +1366,31 @@ playAgainBtn.addEventListener('click', () => {
     gameOverOverlay.classList.remove('visible');
     isGameOver = false; // Clear game over state
     
+    // Reset input state
+    resetKeyStates();
+    
     // If the game is over, reset it rather than just rejoining
-    socket.emit('resetGame');
+    sendResetGameRequest();
 
     // Keep the same room but rejoin
     socket.emit('joinGame', {
         gameId: gameId,
         playerName: playerName
     });
+    
+    // Force touch controls re-initialization for mobile
+    if (isMobileDevice()) {
+        setTimeout(() => {
+            mobileDebug("Reinitializing touch controls after play again");
+            cleanupTouchControls();
+            initTouchControls();
+        }, 100);
+    }
 });
 
 // Update player snake direction on arrow key press/release
 document.addEventListener('keydown', handleKeyDown);
 document.addEventListener('keyup', handleKeyUp);
-
-// Add touch controls for mobile devices
-function addTouchControls() {
-    const touchControls = document.createElement('div');
-    touchControls.className = 'touch-controls';
-    touchControls.innerHTML = `
-        <div class="touch-control up">▲</div>
-        <div class="touch-control-row">
-            <div class="touch-control left">◀</div>
-            <div class="touch-control right">▶</div>
-        </div>
-        <div class="touch-control down">▼</div>
-    `;
-    
-    document.body.appendChild(touchControls);
-    
-    // Updated touch controls for better responsiveness
-    const upBtn = document.querySelector('.touch-control.up');
-    const rightBtn = document.querySelector('.touch-control.right');
-    const downBtn = document.querySelector('.touch-control.down');
-    const leftBtn = document.querySelector('.touch-control.left');
-    
-    // Touch start events
-    upBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        keyState.ArrowUp = true;
-    });
-    rightBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        keyState.ArrowRight = true;
-    });
-    downBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        keyState.ArrowDown = true;
-    });
-    leftBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        keyState.ArrowLeft = true;
-    });
-    
-    // Touch end events
-    upBtn.addEventListener('touchend', () => { keyState.ArrowUp = false; });
-    rightBtn.addEventListener('touchend', () => { keyState.ArrowRight = false; });
-    downBtn.addEventListener('touchend', () => { keyState.ArrowDown = false; });
-    leftBtn.addEventListener('touchend', () => { keyState.ArrowLeft = false; });
-    
-    // Mouse events for testing on desktop
-    upBtn.addEventListener('mousedown', () => { keyState.ArrowUp = true; });
-    rightBtn.addEventListener('mousedown', () => { keyState.ArrowRight = true; });
-    downBtn.addEventListener('mousedown', () => { keyState.ArrowDown = true; });
-    leftBtn.addEventListener('mousedown', () => { keyState.ArrowLeft = true; });
-    
-    upBtn.addEventListener('mouseup', () => { keyState.ArrowUp = false; });
-    rightBtn.addEventListener('mouseup', () => { keyState.ArrowRight = false; });
-    downBtn.addEventListener('mouseup', () => { keyState.ArrowDown = false; });
-    leftBtn.addEventListener('mouseup', () => { keyState.ArrowLeft = false; });
-    
-    // Add styles
-    const style = document.createElement('style');
-    style.textContent = `
-        .touch-controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            z-index: 100;
-        }
-        .touch-control-row {
-            display: flex;
-            gap: 50px;
-        }
-        .touch-control {
-            width: 60px;
-            height: 60px;
-            background-color: rgba(76, 175, 80, 0.7);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            color: white;
-            user-select: none;
-            cursor: pointer;
-            touch-action: none; /* Prevent browser handling of touches */
-        }
-        .touch-control:active {
-            background-color: rgba(76, 175, 80, 1);
-            transform: scale(0.95);
-        }
-        @media (min-width: 769px) {
-            .touch-controls {
-                display: none;
-            }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
-// Check if on mobile device
-const isMobileDevice = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
 
 // Load saved game ID and player name if available
 window.addEventListener('load', () => {
@@ -1089,9 +1411,13 @@ window.addEventListener('load', () => {
     // Connect to server
     connectToServer();
     
-    // Add mobile controls if on a mobile device
+    // Initialize touch controls if on mobile device
     if (isMobileDevice()) {
-        addTouchControls();
+        mobileDebug("Mobile device detected");
+        setTimeout(() => {
+            initTouchControls();
+            fixResetButtonForMobile();
+        }, 1000); // Slight delay to ensure DOM is ready
     }
     
     // Force initial draw
@@ -1102,6 +1428,14 @@ window.addEventListener('load', () => {
 window.addEventListener('resize', () => {
     // Force a redraw on resize
     draw();
+    
+    // Reinitialize touch controls on resize for mobile
+    if (isMobileDevice() && touchControlsInitialized) {
+        mobileDebug("Reinitializing touch controls after resize");
+        cleanupTouchControls();
+        initTouchControls();
+        fixResetButtonForMobile();
+    }
 });
 
 // Handle visibility change - optimize performance when tab is not visible
@@ -1111,12 +1445,48 @@ document.addEventListener('visibilitychange', () => {
         stopAnimationLoop();
         
         // Reset key states to prevent stuck keys
-        keyState.ArrowUp = false;
-        keyState.ArrowDown = false;
-        keyState.ArrowLeft = false;
-        keyState.ArrowRight = false;
+        resetKeyStates();
     } else {
         // Resume animation when tab becomes visible again
         startAnimationLoop();
+        
+        // Reinitialize touch controls when tab becomes visible again
+        if (isMobileDevice()) {
+            mobileDebug("Reinitializing touch controls after visibility change");
+            cleanupTouchControls();
+            initTouchControls();
+            fixResetButtonForMobile();
+        }
     }
 });
+
+// Add additional safeguards for mobile
+window.addEventListener('orientationchange', () => {
+    if (isMobileDevice()) {
+        mobileDebug("Orientation changed, reinitializing controls");
+        
+        // Reset key states
+        resetKeyStates();
+        
+        // Delay to allow orientation to complete
+        setTimeout(() => {
+            cleanupTouchControls();
+            initTouchControls();
+            fixResetButtonForMobile();
+        }, 500);
+    }
+});
+
+// Address issue where mobile browsers sometimes don't properly handle touch events
+window.addEventListener('touchstart', function onFirstTouch() {
+    // Apply active touch class to body
+    document.body.classList.add('touch-active');
+    
+    // Enable :active pseudo selectors
+    document.addEventListener('touchstart', function() {}, { passive: false });
+    
+    // Remove this event listener
+    window.removeEventListener('touchstart', onFirstTouch);
+    
+    mobileDebug("Touch initialized on document");
+}, { once: true, passive: true });
