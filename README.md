@@ -36,7 +36,7 @@ A real-time multiplayer Snake game where players can compete against each other 
 ## 📋 Prerequisites
 
 - Node.js (v14+)
-- npm or yarn
+- npm
 - SSL certificates (for production deployment)
 
 ## 📸 Screenshots
