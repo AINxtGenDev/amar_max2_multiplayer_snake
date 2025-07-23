@@ -31,6 +31,7 @@ Let's build something robust, scalable, and secure.
 
 # Task: please review my code and optimize it based on best practices, please provide also a plan how to use it on my raspberry 4
 
+the game must be accessible from outside at amarmax.duckdns.org
 amarmax.duckdns.org
 
 content of my Caddyfile:
