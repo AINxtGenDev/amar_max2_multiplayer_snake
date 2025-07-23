@@ -194,6 +194,8 @@ The game will be available at `http://localhost:10555`
 3. **Enable startup on system boot**
    ```bash
    pm2 startup
+    sudo env PATH=$PATH:/home/stecher/.nvm/versions/node/v22.17.1/bin /home/stecher/.nvm/versions/node/v22.17.1/lib/node_modules/pm2/bin/pm2 startup systemd -u stecher --hp /home/stecher
+
    pm2 save
    ```
 
