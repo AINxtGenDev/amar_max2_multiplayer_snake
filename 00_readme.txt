@@ -40,3 +40,11 @@
 
 11) Save the current process so it's restored after a reboot
     pm2 save
+    
+12) Monitor in production:
+    pm2 monitor
+    
+    bucket: snake-game
+
+    https://app.pm2.io/#/bucket/6880be570bfa918d9307bf80
+
