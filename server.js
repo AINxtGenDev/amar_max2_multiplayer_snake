@@ -1,24 +1,18 @@
-// WPL 15.04.2025 v1.4
+// WPL 23.07.2025 v1.5
 const express = require('express');
-const http = require('http');
+const http = require('http'); // Changed from https to http
 const socketIo = require('socket.io');
 const path = require('path');
 const cors = require('cors');
-const fs = require('fs');
-const https = require('https');
+// const fs = require('fs'); // No longer needed
 
 // Create Express app
 const app = express();
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Set up HTTPS server (required for your domain)
-const options = {
-  key: fs.readFileSync('/home/stecher/multiplayer-snake/certificates/privkey.pem'),
-  cert: fs.readFileSync('/home/stecher/multiplayer-snake/certificates/fullchain.pem')
-};
-
-const server = https.createServer(options, app);
+// Set up HTTP server - Caddy will handle HTTPS
+const server = http.createServer(app);
 
 // Initialize Socket.IO
 const io = socketIo(server, {
@@ -772,9 +766,10 @@ function updateGame(gameId) {
 }
 
 // Start server
+// The application will listen on port 10555. Caddy will forward traffic from 10556 to this port.
 const PORT = process.env.PORT || 10555;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Grace period set to ${GRACE_PERIOD_SECONDS} seconds (${GRACE_PERIOD_TICKS} ticks)`);
   console.log(`Countdown set to ${COUNTDOWN_SECONDS} seconds`);
 });
